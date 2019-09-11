@@ -54,6 +54,6 @@ steps:
 
 - task: AzureWebApp@1
   inputs:
-    azureSubscription: '<Azure service connection>'
-    appName: '<Name of web app>'
+    azureSubscription: 'Azure DevOps Connections'
+    appName: 'TestApp'
     package: $(System.ArtifactsDirectory)/**/*.zip

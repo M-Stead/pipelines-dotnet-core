@@ -1,5 +1,6 @@
 # ASP.NET Core
 
+
 # Build and test ASP.NET Core projects targeting .NET Core.
 # Add steps that run tests, create a NuGet package, deploy, and more:
 # https://docs.microsoft.com/azure/devops/pipelines/languages/dotnet-core
@@ -53,7 +54,7 @@ steps:
     appName: 'Testwebapp45435'
     package: $(System.ArtifactsDirectory)/**/*.zip
 
-- task: CreateStorageAccount@1
+- task: AzureCLI@1
   inputs:
     azureSubscription: 'Azure DevOps Connections'
     scriptLocation: 'inlineScript'
@@ -64,7 +65,7 @@ steps:
       rem Create the file share
       call az storage share create -n %ACI_SHARE_NAME% --account-name %ACI_STORAGE_ACCOUNT_NAME%
 
-- task: CreateOWASPContainer@1
+- task: AzureCLI@1
   inputs:
     azureSubscription: 'Azure DevOps Connections'
     scriptLocation: 'inlineScript'

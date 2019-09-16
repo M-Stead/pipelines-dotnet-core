@@ -23,12 +23,14 @@ steps:
     arguments: '--configuration Release' # Update this to match your need
 
 - task: DotNetCoreCLI@2
+  displayName: Test
   inputs:
     command: test
     projects: '**/*Tests/*.csproj'
     arguments: '--configuration $(buildConfiguration)'
 
 - task: DotNetCoreCLI@2
+  displayName: Publish
   inputs:
     command: publish
     publishWebProjects: True
@@ -37,24 +39,20 @@ steps:
 
 # this code takes all the files in $(Build.ArtifactStagingDirectory) and uploads them as an artifact of your build.
 - task: PublishBuildArtifacts@1
+  displayName: PublishBuildArtifacts
   inputs:
     pathtoPublish: '$(Build.ArtifactStagingDirectory)' 
     artifactName: 'myWebsiteName'
 
-- task: DotNetCoreCLI@2
-  inputs:
-    command: publish
-    publishWebProjects: True
-    arguments: '--configuration $(BuildConfiguration) --output $(Build.ArtifactStagingDirectory)'
-    zipAfterPublish: True
-
 - task: AzureWebApp@1
+  displayName: Deploy Application
   inputs:
     azureSubscription: 'Azure DevOps Connections'
     appName: 'Testwebapp45435'
     package: $(System.ArtifactsDirectory)/**/*.zip
 
 - task: AzureCLI@1
+  displayName: Create Storage Account
   inputs:
     azureSubscription: 'Azure DevOps Connections'
     scriptLocation: 'inlineScript'
@@ -63,9 +61,32 @@ steps:
       az storage share create -n $(ACI_SHARE_NAME) --account-name $(ACI_STORAGE_ACCOUNT_NAME)
 
 - task: AzureCLI@1
+  displayName: Create OWASP Container
   inputs:
     azureSubscription: 'Azure DevOps Connections'
     scriptLocation: 'inlineScript'
     inlineScript: |
       az storage account keys list -g $(ACI_RESOURCE_GROUP) --account-name $(ACI_STORAGE_ACCOUNT_NAME) --query "[0].value" --output tsv > temp.txt
-      az container create -g $(ACI_RESOURCE_GROUP) -n $(ACI_INSTANCE_NAME) --image owasp/zap2docker-stable --ip-address public --ports 8080 --azure-file-volume-account-name %$(CI_STORAGE_ACCOUNT_NAME) --azure-file-volume-account-key $(STORAGE_KEY) --azure-file-volume-share-name $(ACI_SHARE_NAME) --azure-file-volume-mount-path /zap/wrk/ --command-line "zap.sh -daemon -host 0.0.0.0 -port 8080 -config api.key=abcd -config api.addrs.addr.name=.* -config api.addrs.addr.regex=true"
+      STORAGE_KEY='cat temp.txt'
+      az container create -g $(ACI_RESOURCE_GROUP) -n $(ACI_INSTANCE_NAME) --image owasp/zap2docker-stable --ip-address public --ports 8080 --azure-file-volume-account-name $(CI_STORAGE_ACCOUNT_NAME) --azure-file-volume-account-key $STORAGE_KEY --azure-file-volume-share-name $(ACI_SHARE_NAME) --azure-file-volume-mount-path /zap/wrk/ --command-line "zap.sh -daemon -host 0.0.0.0 -port 8080 -config api.key=abcd -config api.addrs.addr.name=.* -config api.addrs.addr.regex=true"
+
+- task: AzureCLI@1
+  displayName: Baseline OWASP ZAP Scan
+  inputs:
+    azureSubscription: 'Azure DevOps Connections'
+    scriptLocation: 'inlineScript'
+    inlineScript: |
+      ZAP_COMMAND="/zap/zap-baseline.py -t $(TARGET_SCAN_ADDRESS) -x OWASP-ZAP-Report.xml"
+      az container exec -g $(ACI_RESOURCE_GROUP) -n $(ACI_INSTANCE_NAME) --exec-command $(ZAP_COMMAND)
+
+- task: AzureCLI@1
+  displayName: Download ZAP Report
+  inputs:
+    azureSubscription: 'Azure DevOps Connections'
+    scriptLocation: 'inlineScript'
+    inlineScript: |
+      az storage account keys list -g $(ACI_RESOURCE_GROUP) --account-name $(ACI_STORAGE_ACCOUNT_NAME) --query "[0].value" --output tsv > temp.txt
+      STORAGE_KEY='cat temp.txt'
+      az storage file download --account-name $(ACI_STORAGE_ACCOUNT_NAME) --account-key $STORAGE_KEY -s $(ACI_SHARE_NAME) -p OWASP-ZAP-Report.xml --dest $SYSTEM_DEFAULTWORKINGDIRECTORY\OWASP-ZAP-Report.xml
+
+

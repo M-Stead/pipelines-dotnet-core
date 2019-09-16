@@ -78,7 +78,8 @@ steps:
     scriptLocation: 'inlineScript'
     inlineScript: |
       ZAP_COMMAND="/zap/zap-baseline.py -t $(TARGET_SCAN_ADDRESS) -x OWASP-ZAP-Report.xml"
-      az container exec -g $(ACI_RESOURCE_GROUP) -n $(ACI_INSTANCE_NAME) --exec-command $ZAP_COMMAND
+      echo $ZAP_COMMAND
+      az container exec -g $(ACI_RESOURCE_GROUP) -n $(ACI_INSTANCE_NAME) --exec-command "$ZAP_COMMAND"
 
 - task: AzureCLI@1
   displayName: Download ZAP Report
